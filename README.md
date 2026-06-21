@@ -111,3 +111,8 @@ can drop in there without touching the rest of the pipeline.
 - `transcribe.py` — faster-whisper word-level transcription
 - `captions.py` — builds ASS subtitle file (pop-on style)
 - `ffmpeg_utils.py` — audio extraction + caption burn-in helpers
+
+## Thank You
+
+- If this tools really help you please give us a rating
+- support us on https://trakteer.id/rawiansyah_andhika_s 
