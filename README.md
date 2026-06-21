@@ -24,9 +24,9 @@ pip install yt-dlp faster-whisper opencv-python --break-system-packages
 ```
 
 You also need `ffmpeg` and `ffprobe` on PATH (most systems already have this;
-`sudo apt install ffmpeg` on Ubuntu/Debian if not).
+`sudo apt install ffmpeg` for Ubuntu or Debian system, kinda lag sometime take your time).
 
-First run will download the Whisper model (~150MB for `base`) from
+First run will download the Whisper model (~150MB for `base`, dont worry it quite fast) from
 Hugging Face — needs internet access once, then it's cached locally.
 
 ## Usage
@@ -40,6 +40,9 @@ python3 main.py https://youtube.com/watch?v=XXXXXXXX
 
 # Custom clip length (seconds)
 python3 main.py my_podcast.mp4 --clip-length 60
+
+# Cap total output to N clips (stops early, doesn't waste time on the rest)
+python3 main.py my_podcast.mp4 --max-clips 5
 
 # Skip captions (faster, no Whisper needed)
 python3 main.py my_podcast.mp4 --no-captions

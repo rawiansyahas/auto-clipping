@@ -64,9 +64,12 @@ def extract_chunk(source_path: str, start: float, end: float, out_path: str):
     subprocess.run(cmd, capture_output=True, text=True, check=True)
 
 
-def split_into_chunks(source_path: str, work_dir: str) -> list:
+def split_into_chunks(source_path: str, work_dir: str, max_chunks: int = None) -> list:
     """
-    Returns list of dicts: {path, start, end, index}
+    Returns list of dicts: {path, start, end, index}.
+    If max_chunks is set, only that many chunks are actually extracted
+    (the full plan is still computed first, so duration/log info stays
+    accurate, but ffmpeg work stops once the cap is reached).
     """
     duration = get_duration_sec(source_path)
     chunk_plan = plan_chunks(duration, config.CLIP_LENGTH_SEC, config.CLIP_OVERLAP_SEC)
@@ -76,6 +79,12 @@ def split_into_chunks(source_path: str, work_dir: str) -> list:
             f"Source is only {duration:.1f}s long and produced zero usable chunks "
             f"at CLIP_LENGTH_SEC={config.CLIP_LENGTH_SEC}s. Try a shorter --clip-length."
         )
+
+    total_planned = len(chunk_plan)
+    if max_chunks is not None and max_chunks < total_planned:
+        print(f"[chunk] {total_planned} chunk(s) possible, extracting only "
+              f"{max_chunks} due to --max-clips")
+        chunk_plan = chunk_plan[:max_chunks]
 
     chunks_dir = os.path.join(work_dir, "chunks")
     os.makedirs(chunks_dir, exist_ok=True)

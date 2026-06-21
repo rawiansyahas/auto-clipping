@@ -12,10 +12,11 @@ Auto-clipper pipeline:
     -> final clips land in clips_output/
 
 Usage:
-    python3 main.py <local_path_or_url> [--no-captions] [--no-facetrack]
+    python3 main.py <local_path_or_url> [--no-captions] [--no-facetrack] [--max-clips N]
 
 Example:
     python3 main.py my_podcast.mp4
+    python3 main.py my_podcast.mp4 --max-clips 5
     python3 main.py https://youtube.com/watch?v=XXXXXXXX
 """
 import argparse
@@ -104,12 +105,16 @@ def main():
     parser.add_argument("--no-captions", action="store_true", help="Skip transcription/captions")
     parser.add_argument("--no-facetrack", action="store_true", help="Use static center crop instead of face tracking")
     parser.add_argument("--clip-length", type=int, default=None, help=f"Clip length in seconds (default {config.CLIP_LENGTH_SEC})")
+    parser.add_argument("--max-clips", type=int, default=None, help="Stop after producing this many clips (default: process the whole video)")
     parser.add_argument("--work-dir", default=config.WORK_DIR)
     parser.add_argument("--output-dir", default=config.OUTPUT_DIR)
     args = parser.parse_args()
 
     if args.clip_length:
         config.CLIP_LENGTH_SEC = args.clip_length
+
+    if args.max_clips is not None and args.max_clips < 1:
+        parser.error("--max-clips must be at least 1")
 
     work_dir = args.work_dir
     output_dir = args.output_dir
@@ -122,8 +127,8 @@ def main():
     local_path = source_input.resolve_source(args.source, work_dir)
 
     print(f"[2/3] Splitting into {config.CLIP_LENGTH_SEC}s chunks...")
-    chunks = chunker.split_into_chunks(local_path, work_dir)
-    print(f"      -> {len(chunks)} chunk(s) planned")
+    chunks = chunker.split_into_chunks(local_path, work_dir, max_chunks=args.max_clips)
+    print(f"      -> {len(chunks)} chunk(s) to process")
 
     print(f"[3/3] Processing chunks (facetrack={not args.no_facetrack}, captions={not args.no_captions})")
     final_clips = []
