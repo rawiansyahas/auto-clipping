@@ -1,5 +1,4 @@
-# Auto-Clipper
-# Auto-Clipper
+# SoftClip - Smart Auto-Clipper
 
 Turns a long video (local file or a YouTube/Twitch/etc. URL) into a batch of
 vertical 9:16 short clips with face-following crop and TikTok-style burned-in
