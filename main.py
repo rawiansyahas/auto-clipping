@@ -29,6 +29,7 @@ import config
 import source_input
 import chunker
 import face_tracker
+import active_speaker_tracker
 import crop_render
 import transcribe
 import captions
@@ -42,10 +43,14 @@ def process_chunk(chunk, work_dir, output_dir, do_facetrack: bool, do_captions: 
 
     print(f"\n=== Clip {tag} ({chunk['start']:.1f}s - {chunk['end']:.1f}s) ===")
 
-    # 1. Face tracking (or skip -> center crop default in crop_render)
+    # 1. Tracking (or skip -> center crop default in crop_render)
     if do_facetrack:
-        print(f"[clip {tag}] tracking face movement...")
-        tracking = face_tracker.track_faces(chunk_path)
+        if config.FACE_TRACK_MODE == "active_speaker":
+            print(f"[clip {tag}] detecting active speaker (hard-cut mode)...")
+            tracking = active_speaker_tracker.track_active_speaker(chunk_path)
+        else:
+            print(f"[clip {tag}] tracking face movement (smooth pan)...")
+            tracking = face_tracker.track_faces(chunk_path)
     else:
         # build a trivial "always center" tracking dict
         import cv2
@@ -104,6 +109,9 @@ def main():
     parser.add_argument("source", help="Local video path or a URL (YouTube/Twitch/etc.)")
     parser.add_argument("--no-captions", action="store_true", help="Skip transcription/captions")
     parser.add_argument("--no-facetrack", action="store_true", help="Use static center crop instead of face tracking")
+    parser.add_argument("--track-mode", choices=["active_speaker", "smooth_pan"], default=None,
+                         help=f"Camera behavior: 'active_speaker' hard-cuts to whoever's talking, "
+                              f"'smooth_pan' eases the crop toward the tracked face (default: {config.FACE_TRACK_MODE})")
     parser.add_argument("--clip-length", type=int, default=None, help=f"Clip length in seconds (default {config.CLIP_LENGTH_SEC})")
     parser.add_argument("--max-clips", type=int, default=None, help="Stop after producing this many clips (default: process the whole video)")
     parser.add_argument("--work-dir", default=config.WORK_DIR)
@@ -112,6 +120,9 @@ def main():
 
     if args.clip_length:
         config.CLIP_LENGTH_SEC = args.clip_length
+
+    if args.track_mode:
+        config.FACE_TRACK_MODE = args.track_mode
 
     if args.max_clips is not None and args.max_clips < 1:
         parser.error("--max-clips must be at least 1")

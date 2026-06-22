@@ -1,4 +1,5 @@
 # Auto-Clipper
+# Auto-Clipper
 
 Turns a long video (local file or a YouTube/Twitch/etc. URL) into a batch of
 vertical 9:16 short clips with face-following crop and TikTok-style burned-in
@@ -24,15 +25,15 @@ pip install yt-dlp faster-whisper opencv-python --break-system-packages
 ```
 
 You also need `ffmpeg` and `ffprobe` on PATH (most systems already have this;
-`sudo apt install ffmpeg` for Ubuntu or Debian system, kinda lag sometime take your time).
+`sudo apt install ffmpeg` on Ubuntu/Debian if not).
 
-First run will download the Whisper model (~150MB for `base`, dont worry it quite fast) from
+First run will download the Whisper model (~150MB for `base`) from
 Hugging Face — needs internet access once, then it's cached locally.
 
 ## Usage
 
 ```bash
-# Local file
+# Local file (active_speaker mode by default — hard cuts to whoever's talking)
 python3 main.py my_podcast.mp4
 
 # From YouTube/Twitch/etc.
@@ -44,10 +45,14 @@ python3 main.py my_podcast.mp4 --clip-length 60
 # Cap total output to N clips (stops early, doesn't waste time on the rest)
 python3 main.py my_podcast.mp4 --max-clips 5
 
+# Explicitly choose tracking mode
+python3 main.py my_podcast.mp4 --track-mode active_speaker   # hard-cut to whoever's talking (default)
+python3 main.py my_podcast.mp4 --track-mode smooth_pan       # smooth eased pan that follows a face
+
 # Skip captions (faster, no Whisper needed)
 python3 main.py my_podcast.mp4 --no-captions
 
-# Static center crop instead of face-following pan
+# Static center crop, no face tracking at all
 python3 main.py my_podcast.mp4 --no-facetrack
 ```
 
@@ -63,31 +68,24 @@ Everything adjustable lives in `config.py`:
 |---|---|
 | `CLIP_LENGTH_SEC` | length of each output clip |
 | `OUTPUT_WIDTH` / `OUTPUT_HEIGHT` | output resolution (default 1080x1920) |
+| `FACE_TRACK_MODE` | `"active_speaker"` (default) or `"smooth_pan"` |
 | `FACE_DETECT_EVERY_N_FRAMES` | how often to re-run face detection (lower = more accurate, slower) |
-| `FACE_SMOOTHING_ALPHA` | 0–1, how snappy vs. smooth the pan is. Lower = smoother/slower pan |
+| `FACE_SMOOTHING_ALPHA` | smooth_pan mode only: 0–1, lower = smoother/slower pan |
+| `SPEAKER_REEVAL_INTERVAL_SEC` | active_speaker mode: how often to re-check who's talking and potentially cut (default 2.5s) |
+| `SWITCH_CONFIDENCE_MARGIN` | active_speaker mode: how much clearer a winner needs to be before cutting (1.3 = 30% margin, higher = fewer cuts) |
 | `WHISPER_MODEL_SIZE` | `tiny`/`base`/`small`/`medium` — bigger = more accurate, slower |
 | `CAPTION_MAX_WORDS_PER_CHUNK` | how many words appear per caption "pop" (1–3 reads best) |
 | `CAPTION_FONT_SIZE`, `CAPTION_FONT_COLOR`, etc. | caption styling |
 
-## How the face tracking works
+## How the tracking modes work
 
-Every `FACE_DETECT_EVERY_N_FRAMES` frames, it runs OpenCV's bundled Haar
-cascade face detector and picks the largest detected face (assumed to be
-the main speaker). Between detections it holds the last known position.
-The crop center is smoothed with an exponential moving average
-(`FACE_SMOOTHING_ALPHA`) so the pan looks deliberate instead of jittery,
-then that path is baked into an ffmpeg `sendcmd` script that drives the
-`crop` filter's x/y per-frame.
+**`active_speaker` (default):** Every `SPEAKER_REEVAL_INTERVAL_SEC` seconds, it samples several frames from that window, detects all faces, and measures how much each face's mouth region changes frame-to-frame. The face with the most mouth movement wins that window, *if* it clearly beats the runner-up by `SWITCH_CONFIDENCE_MARGIN` — otherwise the previous speaker holds to avoid flickering on ambiguous/overlapping speech. When a winner is decided, the crop snaps instantly (hard cut) to center on them and stays there for the whole window.
 
-If no face is ever found in a chunk, it falls back to a static center crop
-automatically — no manual intervention needed.
+**`smooth_pan`:** Detects the largest face every N frames and eases the crop center toward it with exponential smoothing. Good for single-speaker content; can look floaty on multi-person footage.
 
-**Known limitation:** Haar cascades are a fast, classic, fully-offline
-detector but not as robust as modern DNN-based face detectors — side
-profiles, poor lighting, or small/distant faces can be missed. If you find
-tracking unreliable on your footage, the swap point is `face_tracker.py`'s
-`_detect_largest_face` function; an OpenCV DNN or MediaPipe-based detector
-can drop in there without touching the rest of the pipeline.
+Both modes fall back to static center crop if no faces are detected.
+
+**Known limitation on detection:** Haar cascades are fast and fully offline but not as robust as modern DNN detectors — side profiles, poor lighting, or small/distant faces can be missed. If tracking is unreliable on your footage, the swap point is `face_tracker.py`'s `_detect_largest_face` and `active_speaker_tracker.py`'s `_detect_faces` — a MediaPipe or OpenCV DNN detector can drop in without touching the rest of the pipeline.
 
 ## Known issues / not yet verified
 
